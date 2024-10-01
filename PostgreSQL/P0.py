@@ -1,4 +1,5 @@
 import psycopg2
+from psycopg2.extras import execute_values
 from config import load_config
 from connect import connect
 
@@ -27,10 +28,13 @@ def insert_sentences(cursor, sentences):
     insert_sentence = '''
         INSERT INTO sentences(sentence) VALUES(%s)
     '''
+
     try:
 
-        for sentence in sentences:
-            cursor.execute(insert_sentence, (sentence, ))
+        data = [(sentence, ) for sentence in sentences] # Create a list of tuples with the sentences
+
+        execute_values(cursor, insert_sentence, data) # Execute the query with the list of tuples, more eficient than execute for each sentence
+
         print('Sentences inserted successfully')
 
     except (psycopg2.DatabaseError, Exception) as error:
@@ -40,9 +44,15 @@ def insert_sentences(cursor, sentences):
 
 def load_sentences(file_path):
 
-    with open(file_path, 'r') as file:
-        sentences = [line.strip() for line in file]  # Read all the lines and strip the newline character
-    return sentences
+    try:
+
+        with open(file_path, 'r') as file:
+            sentences = [line.strip() for line in file]  # Read all the lines and strip the newline character
+        return sentences
+    
+    except FileNotFoundError as error:
+        print(f"Error loading the sentences: {error}")
+        raise
 
 if __name__ == '__main__':
     
