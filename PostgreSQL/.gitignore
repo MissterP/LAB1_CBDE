@@ -1,2 +1,4 @@
 # Ignore the database configuration file
 database.ini
+venv
+__pycache__
