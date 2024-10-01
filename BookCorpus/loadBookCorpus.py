@@ -6,7 +6,7 @@ ds = load_dataset("williamkgao/bookcorpus100mb") # 100MB of BookCorpus
 
 sentences = ds['train']['text'][:10000] # take first 10k sentences
 
-with open('/home/pablo/Escritorio/Uni/CDBE/LAB1/all-MiniLM-L6-v2/sentences.txt', 'w') as f:
+with open('./sentences.txt', 'w') as f:
     for sentence in sentences:
         f.write(sentence + '\n')
 
