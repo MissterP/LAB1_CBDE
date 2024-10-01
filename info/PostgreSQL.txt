@@ -1,0 +1,35 @@
+Conectar base de datos PostgreSQL a Python: https://www.postgresqltutorial.com/postgresql-python/connect/
+
+	- A tener en cuenta a nivel comandos:
+	
+		- The virtual environment was not created successfully because ensurepip is 
+		not available.  On Debian/Ubuntu systems, you need to install the 
+		python3-venv package using the following command.
+
+    			sudo apt install python3.12-venv (Buscar la versión reciente)
+    			
+    		- Ejecutar python3 -m venv venv 
+    		
+    		- Instalar sudo apt install python3.12-dev libpq-dev build-essential
+    		
+    		- Entrar entorno y actualizar pip con: pip install --upgrade pip
+    		
+    		- Te instalaste PostgreSQL con contraseña por ello tienes método 
+    		de autentificación con contraseña en vez de cambiar de usuario por ello,
+    		entrar en PostgreSQL con: psql -U cbde -h localhost -W
+    		
+    		- He creado un nuevo usuario para trabajar en los labs de cbde pero el 
+    		super user! es el podtgres! Quien crea todo y tal. Luego se le otorgan 
+    		permisos al user para nuestra base de datos suppliers.
+    		
+    		- database.ini es como un .env
+
+Sobre entorno virtuales de Python (info extra, no hace falta revisar): https://www.pythontutorial.net/python-basics/python-virtual-environments/
+
+	- En resumen: 
+		Python uses virtual environments to create an isolated environment for 
+		every project. In other words, each project will have its own directory 
+		to store third-party packages.
+
+		In case you have multiple projects that use different versions of a 
+		package, you can store them in separate virtual environments.
