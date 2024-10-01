@@ -2,7 +2,7 @@ Repositorio dónde se guardan los distintos experimentos del LAB1 de CBDE por ca
 
   - A tener en cuenta:
     
-    - Añadir a dentro de la carpeta PostgreSQL el archivo "database.ini" con la siguiente info:
+    - Añadir a dentro de la carpeta PostgreSQL el archivo "database.ini" con la siguiente info (entrar dentro readMe para que se vea bien):
       
       [postgresql]
       host=localhost
