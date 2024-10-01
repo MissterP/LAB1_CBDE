@@ -10,6 +10,3 @@ with open('./sentences.txt', 'w') as f:
     for sentence in sentences:
         f.write(sentence + '\n')
 
-#model = SentenceTransformer('sentence-transformers/all-MiniLM-L6-v2') # Load MiniLM model
-
-#embeddings = model.encode(sentences) # Compute embeddings
