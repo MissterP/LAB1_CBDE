@@ -2,6 +2,7 @@ import psycopg2
 from config import load_config
 from connect import connect
 
+BATCH_SIZE = 500
 
 def create_table_sentences(cursor):
 
@@ -22,17 +23,23 @@ def create_table_sentences(cursor):
         print(f"Error creating the table sentences: {error}")
         raise # Re-raise the exception
 
-def insert_sentences(cursor, sentences):
+def insert_sentences(cursor, sentences, batch_size=500):
 
     insert_sentence = '''
         INSERT INTO sentences(sentence) VALUES(%s)
     '''
 
     try:
+        batch = []
+        for sentence in sentences:
+            batch.append((sentence, )) # Create a tuple with the sentence
+            if len(batch) == batch_size:
+                cursor.executemany(insert_sentence, batch) # Execute the query with the batch of tuples
+                batch = []
 
-        data = [(sentence, ) for sentence in sentences] # Create a list of tuples with the sentences
-
-        cursor.executemany(insert_sentence, data) # Execute the query with the list of tuples, more eficient than execute for each sentence
+        # Insert any remaining sentences that didn't fill a complete batch
+        if batch:
+            cursor.executemany(insert_sentence, batch)
 
         print('Sentences inserted successfully')
 
@@ -46,8 +53,8 @@ def load_sentences(file_path):
     try:
 
         with open(file_path, 'r') as file:
-            sentences = [line.strip() for line in file]  # Read all the lines and strip the newline character
-        return sentences
+             for line in file:
+                yield line.strip()  # Yield one sentence at a time
     
     except FileNotFoundError as error:
         print(f"Error loading the sentences: {error}")
@@ -73,7 +80,7 @@ if __name__ == '__main__':
 
                     create_table_sentences(cursor)
                     sentences = load_sentences('../BookCorpus/sentences.txt')
-                    insert_sentences(cursor, sentences)
+                    insert_sentences(cursor, sentences, batch_size=BATCH_SIZE)
                     database_transaction.commit()
 
     except (psycopg2.DatabaseError, Exception) as error:

@@ -3,17 +3,22 @@ from config import load_config
 from connect import connect
 from sentence_transformers import SentenceTransformer
 
+BATCH_SIZE = 500
 
-def extract_sentences(cursor):
+def extract_sentences(cursor, batch_size=500):
 
     select_sentences = '''
-        SELECT id, sentence FROM sentences    
+        SELECT id, sentence FROM sentences ORDER BY id    
     '''
 
-    try: 
+    try:
         cursor.execute(select_sentences)
-        sentences =  cursor.fetchall() # Fetch all the sentences, returns a list of tuples (id, sentence)
-        return sentences
+        while True:
+            sentences_batch = cursor.fetchmany(batch_size) # Fetch a batch of sentences, by default 500
+            if not sentences_batch:
+                break
+            yield sentences_batch  # Yield the batch of sentences
+
     except (psycopg2.DatabaseError, Exception) as error:
         print(f"Error extracting the sentences from database: {error}")
         raise
@@ -23,10 +28,8 @@ def get_sentences(setences_tuples):
 
     return [sentence for _, sentence in setences_tuples]
 
-def transform_senteces_embeddings(setences_tuples):
+def transform_senteces_embeddings(model, sentences):
 
-    model = SentenceTransformer('sentence-transformers/all-MiniLM-L6-v2')
-    sentences = get_sentences(setences_tuples)
     embeddings = model.encode(sentences)
     return embeddings
 
@@ -47,7 +50,6 @@ def update_with_embeddings(cursor, setences_tuples, embeddings):
         # The embedding is converted to a list of floats with the tolist() method.
 
         cursor.executemany(update_query, data)
-        print('Embeddings updated successfully')
 
     except (psycopg2.DatabaseError, Exception) as error:
         print(f"Error updating the embeddings in the database: {error}")
@@ -69,11 +71,18 @@ if __name__ == '__main__':
 
         with database_transaction:
 
-            with database_transaction.cursor() as cursor:
+            with database_transaction.cursor() as fetch_cursor, database_transaction.cursor() as update_cursor:
                     
-                    sentences_tuples = extract_sentences(cursor)
-                    embeddings = transform_senteces_embeddings(sentences_tuples)
-                    update_with_embeddings(cursor, sentences_tuples, embeddings)
+                    model = SentenceTransformer('sentence-transformers/all-MiniLM-L6-v2')
+
+                    for sentences_tuples in extract_sentences(fetch_cursor, batch_size=BATCH_SIZE):
+
+                        sentences = get_sentences(sentences_tuples)
+                        embeddings = transform_senteces_embeddings(model, sentences)
+                        update_with_embeddings(update_cursor, sentences_tuples, embeddings)
+                        
+                    print('Embeddings updated successfully')
+                    database_transaction.commit()
 
     except (psycopg2.DatabaseError, Exception) as error:
 

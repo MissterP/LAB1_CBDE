@@ -17,32 +17,27 @@ sentences_to_test = ["usually , he would be tearing around the living room , pla
                      "each time she looked into mason 's face , she was grateful that he looked nothing like his father ."
                      ]
 
+BATCH_SIZE = 500
 
-def extract_sentences_embeddings(cursor, use_test_sentences=True):
+def get_test_sentences_embeddings(cursor):
+    select_sentences = '''
+        SELECT sentence, embedding FROM sentences WHERE sentence = ANY(%s)
+    '''
+    parameters = (sentences_to_test,)
+    cursor.execute(select_sentences, parameters)
+    sentences = cursor.fetchall()
+    return sentences  
 
-    if use_test_sentences:
-
-        select_sentences = '''
-            SELECT sentence, embedding FROM sentences WHERE sentence = ANY(%s)
-        '''
-        parameters = (sentences_to_test,)
-        
-    else:
-
-        select_sentences = '''
-            SELECT sentence, embedding FROM sentences    
-        '''
-        parameters = None
-        
-    try:
-
-        cursor.execute(select_sentences, parameters) # Depending on the value of sentences_test, we pass a tuple with the sentences or an empty tuple 
-        sentences = cursor.fetchall() # Fetch all the sentences, returns a list of tuples (sentence, embedding)
-        return sentences
-    
-    except (psycopg2.DatabaseError, Exception) as error:
-        print(f"Error extracting the sentences from database: {error}")
-        raise
+def get_database_sentences_embeddings(cursor, batch_size=500):
+    select_sentences = '''
+        SELECT sentence, embedding FROM sentences
+    '''
+    cursor.execute(select_sentences)
+    while True:
+        sentences_batch = cursor.fetchmany(batch_size)
+        if not sentences_batch:
+            break
+        yield sentences_batch  
 
 
 def cosine_similarity(embedding_test, embedding_database):  
@@ -73,31 +68,54 @@ def calculate_similarity(embedding_test, embedding_database, use_cosine=True):
         return L2_squared_distance(embedding_test, embedding_database)
     
 
-def get_top_2_similar_sentences(sentences_test_embeddings, sentences_database_embeddings, use_cosine=True):
+def get_top_2_similar_sentences(sentences_test_embeddings, sentences_database_embeddings_batches, use_cosine=True):
 
-    for sentence_test, embedding_test in sentences_test_embeddings:
+    # Initialize a dictionary with the sentences to test as keys and an empty list as values
+    top_2_similar_sentences_dict = {sentence_test: [] for sentence_test, _ in sentences_test_embeddings}
 
-        top_2_similar_sentences = []
+    for sentences_database_embeddings in sentences_database_embeddings_batches:  # Iterate over the batches
 
-        for sentence_database, embedding_database in sentences_database_embeddings:
-
-            if sentence_database == sentence_test:
+        for sentence_test, embedding_test in sentences_test_embeddings:
+            
+            # Verify that the embedding of the test sentence is not None
+            if embedding_test is None:
                 continue
 
-            similarity = calculate_similarity(embedding_test, embedding_database, use_cosine)
+            top_2 = top_2_similar_sentences_dict[sentence_test]
 
-            if len(top_2_similar_sentences) < 2:
-                top_2_similar_sentences.append((sentence_database, similarity))
-                if len(top_2_similar_sentences) == 2:
-                    top_2_similar_sentences.sort(key=lambda x: x[1], reverse=True) # Sort the list of tuples by the similarity value
+            for sentence_database, embedding_database in sentences_database_embeddings:
 
-            elif similarity > top_2_similar_sentences[1][1] and sentence_database not in top_2_similar_sentences[0]:
-                top_2_similar_sentences[1] = (sentence_database, similarity)
-                top_2_similar_sentences.sort(key=lambda x: x[1], reverse=True) # Sort the list of tuples by the similarity value
+                # Verifiy that the embedding of the database sentence is not None and that the sentence is not the same as the test sentence
+                if embedding_database is None or sentence_database == sentence_test:
+                    continue
 
-        print(f'Top 2 similar sentences for the sentence "{sentence_test}":')
-        for sentence, similarity in top_2_similar_sentences:
-            print(f'Sentence: {sentence}, Similarity: {similarity}')
+                similarity = calculate_similarity(embedding_test, embedding_database, use_cosine)
+
+                if len(top_2) < 2:
+                    top_2.append((sentence_database, similarity))
+                    if len(top_2) == 2:
+                        if use_cosine:
+                            top_2.sort(key=lambda x: x[1], reverse=True)
+                        else:
+                            top_2.sort(key=lambda x: x[1])
+                else:
+                    if ((use_cosine and similarity > top_2[1][1]) or
+                        (not use_cosine and similarity < top_2[1][1])) and sentence_database != top_2[0][0]:
+                        top_2[1] = (sentence_database, similarity)
+                        if use_cosine:
+                            top_2.sort(key=lambda x: x[1], reverse=True)
+                        else:
+                            top_2.sort(key=lambda x: x[1])
+
+            # Reassign the list of top 2 similar sentences to the dictionary
+            top_2_similar_sentences_dict[sentence_test] = top_2
+
+    for sentence_test in sentences_to_test:
+        top_2 = top_2_similar_sentences_dict.get(sentence_test, [])
+        print(f'\nTop 2 similar sentences for the sentence:\n"{sentence_test}"\n')
+        for sentence, similarity in top_2:
+            print(f'Sentence: {sentence}\nSimilarity: {similarity}\n')
+
 
 
 def main(use_cosine=True):
@@ -121,11 +139,13 @@ def main(use_cosine=True):
 
         with database_transaction:
 
-            with database_transaction.cursor() as cursor:
+            with database_transaction.cursor() as cursor_test, database_transaction.cursor() as cursor_database:
 
-                sentences_test_embeddings = extract_sentences_embeddings(cursor, use_test_sentences=True)
-                sentences_database_embeddings = extract_sentences_embeddings(cursor, use_test_sentences=False)
+                sentences_test_embeddings = get_test_sentences_embeddings(cursor_test)
+                sentences_database_embeddings = get_database_sentences_embeddings(cursor_database, batch_size=BATCH_SIZE)
                 get_top_2_similar_sentences(sentences_test_embeddings, sentences_database_embeddings, use_cosine)
+            
+            database_transaction.commit()
                     
 
     except (psycopg2.DatabaseError, Exception) or (ValueError, Exception) as error:
