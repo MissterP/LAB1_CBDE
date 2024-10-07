@@ -31,9 +31,10 @@ def get_test_sentences_embeddings(cursor):
 
 def get_database_sentences_embeddings(cursor, batch_size=500):
     select_sentences = '''
-        SELECT sentence, embedding FROM sentences
+        SELECT sentence, embedding FROM sentences WHERE sentence <> ALL(%s)
     '''
-    cursor.execute(select_sentences)
+    parameters = (sentences_to_test,)
+    cursor.execute(select_sentences, parameters)
     while True:
         sentences_batch = cursor.fetchmany(batch_size)
         if not sentences_batch:
@@ -69,16 +70,18 @@ def calculate_similarity(embedding_test, embedding_database, use_cosine=True):
     else: 
         return L2_squared_distance(embedding_test, embedding_database)
     
-FIRST_BATCH = True
+FIRST_TIME = True
 
 def get_top_2_similar_sentences(sentences_test_embeddings, sentences_database_embeddings_batches, use_cosine=True):
-    global FIRST_BATCH
+    global FIRST_TIME
+
+    if FIRST_TIME:
+            start_time = time.time()
+            FIRST_TIME = False
 
     top_2_similar_sentences_dict = {sentence_test: [] for sentence_test, _ in sentences_test_embeddings}
 
     for sentences_database_embeddings in sentences_database_embeddings_batches: 
-        if FIRST_BATCH:
-            start_time = time.time()
 
         for sentence_test, embedding_test in sentences_test_embeddings:
             
@@ -89,7 +92,7 @@ def get_top_2_similar_sentences(sentences_test_embeddings, sentences_database_em
 
             for sentence_database, embedding_database in sentences_database_embeddings:
 
-                if embedding_database is None or sentence_database == sentence_test:
+                if embedding_database is None:
                     continue
 
                 similarity = calculate_similarity(embedding_test, embedding_database, use_cosine)
@@ -112,11 +115,9 @@ def get_top_2_similar_sentences(sentences_test_embeddings, sentences_database_em
 
             top_2_similar_sentences_dict[sentence_test] = top_2
         
-        if FIRST_BATCH:
-            end_time = time.time()
-            elapsed_time = end_time - start_time
-            print(f'Batch processed in {elapsed_time} seconds')
-            FIRST_BATCH = False
+    end_time = time.time()
+    elapsed_time = end_time - start_time
+    print(f'Batch processed in {elapsed_time} seconds')
 
     for sentence_test in sentences_to_test:
         top_2 = top_2_similar_sentences_dict.get(sentence_test, [])
