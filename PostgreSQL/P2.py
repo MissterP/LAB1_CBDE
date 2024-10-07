@@ -1,3 +1,4 @@
+import time
 import psycopg2
 import argparse
 from config import load_config
@@ -39,6 +40,7 @@ def get_database_sentences_embeddings(cursor, batch_size=500):
             break
         yield sentences_batch  
 
+FIRST_BATCH = True
 
 def cosine_similarity(embedding_test, embedding_database):  
     
@@ -67,17 +69,19 @@ def calculate_similarity(embedding_test, embedding_database, use_cosine=True):
     else: 
         return L2_squared_distance(embedding_test, embedding_database)
     
+FIRST_BATCH = True
 
 def get_top_2_similar_sentences(sentences_test_embeddings, sentences_database_embeddings_batches, use_cosine=True):
+    global FIRST_BATCH
 
-    # Initialize a dictionary with the sentences to test as keys and an empty list as values
     top_2_similar_sentences_dict = {sentence_test: [] for sentence_test, _ in sentences_test_embeddings}
 
-    for sentences_database_embeddings in sentences_database_embeddings_batches:  # Iterate over the batches
+    for sentences_database_embeddings in sentences_database_embeddings_batches: 
+        if FIRST_BATCH:
+            start_time = time.time()
 
         for sentence_test, embedding_test in sentences_test_embeddings:
             
-            # Verify that the embedding of the test sentence is not None
             if embedding_test is None:
                 continue
 
@@ -85,7 +89,6 @@ def get_top_2_similar_sentences(sentences_test_embeddings, sentences_database_em
 
             for sentence_database, embedding_database in sentences_database_embeddings:
 
-                # Verifiy that the embedding of the database sentence is not None and that the sentence is not the same as the test sentence
                 if embedding_database is None or sentence_database == sentence_test:
                     continue
 
@@ -107,16 +110,19 @@ def get_top_2_similar_sentences(sentences_test_embeddings, sentences_database_em
                         else:
                             top_2.sort(key=lambda x: x[1])
 
-            # Reassign the list of top 2 similar sentences to the dictionary
             top_2_similar_sentences_dict[sentence_test] = top_2
+        
+        if FIRST_BATCH:
+            end_time = time.time()
+            elapsed_time = end_time - start_time
+            print(f'Batch processed in {elapsed_time} seconds')
+            FIRST_BATCH = False
 
     for sentence_test in sentences_to_test:
         top_2 = top_2_similar_sentences_dict.get(sentence_test, [])
         print(f'\nTop 2 similar sentences for the sentence:\n"{sentence_test}"\n')
         for sentence, similarity in top_2:
             print(f'Sentence: {sentence}\nSimilarity: {similarity}\n')
-
-
 
 def main(use_cosine=True):
 

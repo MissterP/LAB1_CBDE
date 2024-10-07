@@ -1,3 +1,4 @@
+import time
 import psycopg2
 from config import load_config
 from connect import connect
@@ -21,7 +22,7 @@ def create_table_sentences(cursor):
     except (psycopg2.DatabaseError, Exception) as error:
 
         print(f"Error creating the table sentences: {error}")
-        raise # Re-raise the exception
+        raise 
 
 def insert_sentences(cursor, sentences, batch_size=500):
 
@@ -29,15 +30,24 @@ def insert_sentences(cursor, sentences, batch_size=500):
         INSERT INTO sentences(sentence) VALUES(%s)
     '''
 
+    first_batch = True
+
     try:
         batch = []
         for sentence in sentences:
-            batch.append((sentence, )) # Create a tuple with the sentence
+            batch.append((sentence, )) 
             if len(batch) == batch_size:
-                cursor.executemany(insert_sentence, batch) # Execute the query with the batch of tuples
+                if first_batch:
+                    start_time = time.time()
+                    cursor.executemany(insert_sentence, batch)
+                    end_time = time.time()
+                    elapsed_time = end_time - start_time
+                    print(f'First batch inserted in {elapsed_time} seconds')
+                    first_batch = False
+                else:
+                    cursor.executemany(insert_sentence, batch) 
                 batch = []
 
-        # Insert any remaining sentences that didn't fill a complete batch
         if batch:
             cursor.executemany(insert_sentence, batch)
 
@@ -46,7 +56,7 @@ def insert_sentences(cursor, sentences, batch_size=500):
     except (psycopg2.DatabaseError, Exception) as error:
 
         print(f"Error inserting the sentences: {error}")
-        raise # Re-raise the exception
+        raise 
 
 def load_sentences(file_path):
 
@@ -54,7 +64,7 @@ def load_sentences(file_path):
 
         with open(file_path, 'r') as file:
              for line in file:
-                yield line.strip()  # Yield one sentence at a time
+                yield line.strip()  
     
     except FileNotFoundError as error:
         print(f"Error loading the sentences: {error}")
@@ -82,6 +92,7 @@ if __name__ == '__main__':
                     sentences = load_sentences('../BookCorpus/sentences.txt')
                     insert_sentences(cursor, sentences, batch_size=BATCH_SIZE)
                     database_transaction.commit()
+                    print('Textual data loaded successfully')
 
     except (psycopg2.DatabaseError, Exception) as error:
 

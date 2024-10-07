@@ -1,3 +1,4 @@
+import time
 import psycopg2
 from config import load_config
 from connect import connect
@@ -33,7 +34,10 @@ def transform_senteces_embeddings(model, sentences):
     embeddings = model.encode(sentences)
     return embeddings
 
+FIRST_BATCH = True
+
 def update_with_embeddings(cursor, setences_tuples, embeddings):
+    global FIRST_BATCH
 
     update_query = '''
         UPDATE sentences
@@ -43,13 +47,16 @@ def update_with_embeddings(cursor, setences_tuples, embeddings):
     
     try:
         data = [(embedding.tolist(), id) for (id, _), embedding in zip(setences_tuples, embeddings)]
-        # Combines the id of the sentence with the embedding. 
-        # We combine in a zip the list of tuples with the sentences and the list of embeddings.
-        # The zip function returns a list of tuples with the elements in the same position of both lists.
-        # We iterate over the zipped list and create a new list of tuples with the id of the sentence and the embedding.
-        # The embedding is converted to a list of floats with the tolist() method.
 
-        cursor.executemany(update_query, data)
+        if FIRST_BATCH:
+            start_time = time.time()
+            cursor.executemany(update_query, data)
+            end_time = time.time()
+            elapsed_time = end_time - start_time
+            print(f'First batch updated in {elapsed_time} seconds')
+            FIRST_BATCH = False
+        else:
+            cursor.executemany(update_query, data)
 
     except (psycopg2.DatabaseError, Exception) as error:
         print(f"Error updating the embeddings in the database: {error}")
