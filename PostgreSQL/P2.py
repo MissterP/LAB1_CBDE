@@ -18,7 +18,7 @@ sentences_to_test = ["usually , he would be tearing around the living room , pla
                      "each time she looked into mason 's face , she was grateful that he looked nothing like his father ."
                      ]
 
-BATCH_SIZE = 500
+BATCH_SIZE = 200
 
 def get_test_sentences_embeddings(cursor):
     select_sentences = '''
@@ -41,7 +41,6 @@ def get_database_sentences_embeddings(cursor, batch_size=500):
             break
         yield sentences_batch  
 
-FIRST_BATCH = True
 
 def cosine_similarity(embedding_test, embedding_database):  
     

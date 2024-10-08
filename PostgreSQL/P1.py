@@ -4,7 +4,7 @@ from config import load_config
 from connect import connect
 from sentence_transformers import SentenceTransformer
 
-BATCH_SIZE = 500
+BATCH_SIZE = 200
 
 def extract_sentences(cursor, batch_size=500):
 
@@ -34,10 +34,10 @@ def transform_senteces_embeddings(model, sentences):
     embeddings = model.encode(sentences)
     return embeddings
 
-FIRST_BATCH = True
+AVERAGE_TIME = []
 
 def update_with_embeddings(cursor, setences_tuples, embeddings):
-    global FIRST_BATCH
+    global AVERAGE_TIME
 
     update_query = '''
         UPDATE sentences
@@ -47,16 +47,11 @@ def update_with_embeddings(cursor, setences_tuples, embeddings):
     
     try:
         data = [(embedding.tolist(), id) for (id, _), embedding in zip(setences_tuples, embeddings)]
-
-        if FIRST_BATCH:
-            start_time = time.time()
-            cursor.executemany(update_query, data)
-            end_time = time.time()
-            elapsed_time = end_time - start_time
-            print(f'First batch updated in {elapsed_time} seconds')
-            FIRST_BATCH = False
-        else:
-            cursor.executemany(update_query, data)
+        start_time = time.time()
+        cursor.executemany(update_query, data)
+        end_time = time.time()
+        elapsed_time = end_time - start_time
+        AVERAGE_TIME.append(elapsed_time)
 
     except (psycopg2.DatabaseError, Exception) as error:
         print(f"Error updating the embeddings in the database: {error}")
@@ -88,6 +83,7 @@ if __name__ == '__main__':
                         embeddings = transform_senteces_embeddings(model, sentences)
                         update_with_embeddings(update_cursor, sentences_tuples, embeddings)
                         
+                    print(f'Average time per batch: {sum(AVERAGE_TIME)/len(AVERAGE_TIME)}')
                     print('Embeddings updated successfully')
                     database_transaction.commit()
 

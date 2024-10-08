@@ -3,7 +3,7 @@ import psycopg2
 from config import load_config
 from connect import connect
 
-BATCH_SIZE = 500
+BATCH_SIZE = 200
 
 def create_table_sentences(cursor):
 
@@ -24,34 +24,36 @@ def create_table_sentences(cursor):
         print(f"Error creating the table sentences: {error}")
         raise 
 
+
 def insert_sentences(cursor, sentences, batch_size=500):
 
     insert_sentence = '''
         INSERT INTO sentences(sentence) VALUES(%s)
     '''
 
-    first_batch = True
+    average_time = []
 
     try:
         batch = []
         for sentence in sentences:
             batch.append((sentence, )) 
             if len(batch) == batch_size:
-                if first_batch:
-                    start_time = time.time()
-                    cursor.executemany(insert_sentence, batch)
-                    end_time = time.time()
-                    elapsed_time = end_time - start_time
-                    print(f'First batch inserted in {elapsed_time} seconds')
-                    first_batch = False
-                else:
-                    cursor.executemany(insert_sentence, batch) 
+
+                start_time = time.time()
+                cursor.executemany(insert_sentence, batch)
+                end_time = time.time()
+                elapsed_time = end_time - start_time
+                average_time.append(elapsed_time)
                 batch = []
 
         if batch:
+            start_time = time.time()
             cursor.executemany(insert_sentence, batch)
+            end_time = time.time()
+            elapsed_time = end_time - start_time
+            average_time.append(elapsed_time)
 
-        print('Sentences inserted successfully')
+        print(f'Average time per batch: {sum(average_time)/len(average_time)}')
 
     except (psycopg2.DatabaseError, Exception) as error:
 
