@@ -1,7 +1,5 @@
-import argparse
-import time
-
 from C0 import get_or_create_table
+import time
 
 sentences_to_test = ["usually , he would be tearing around the living room , playing with his toys .",
                      "but just one look at a minion sent him practically catatonic .",
@@ -24,8 +22,6 @@ def get_top_2_similar_sentences(use_cosine=True, show_sentences=False):
         else:
             print('Using L2 squared distance')
             collection = get_or_create_table(table='sentences', distance="l2", persistent=True)
-
-        results = []
 
         start_time = time.time()
         results = collection.query(

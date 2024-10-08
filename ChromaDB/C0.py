@@ -1,7 +1,4 @@
-import os
-
 import chromadb
-from datasets import load_dataset
 import time
 
 
